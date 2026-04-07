@@ -1,14 +1,19 @@
 {
   "compilerOptions": {
     "target": "ESNext",
+    "module": "ESNext",
     "strict": true,
-    "moduleResolution": "node",
-    "module": "CommonJS",
+    "moduleResolution": "bundler",
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "esModuleInterop": true,
-    "allowSyntheticDefaultImports": true
+    "allowSyntheticDefaultImports": true,
+    "types": [
+      "bun-types"
+    ]
   },
-  "include": ["."],
-  "exclude": ["node_modules", "bench", "__test__"]
+  "include": [
+    "./bench/",
+  ],
+  "exclude": []
 }
