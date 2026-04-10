@@ -22,7 +22,7 @@ class Cipher extends Transform {
 		this.deallocator = dealloc
 	}
 
-	private processBuffer(chunk: Buffer) {
+	public processBuffer(chunk: Buffer) {
 		const buffer_pointer = encrypt(chunk, chunk.length, this.ctx)
 		if (!buffer_pointer) return
 		return toBufferDealloc(buffer_pointer, 0, chunk.length, this.deallocator)
@@ -50,7 +50,7 @@ class Decipher extends Transform {
 		this.ctx = ctx
 		this.deallocator = dealloc
 	}
-	private processBuffer(chunk: Buffer) {
+	public processBuffer(chunk: Buffer) {
 		const buffer_pointer = decrypt(chunk, chunk.length, this.ctx)
 		if (!buffer_pointer) return
 		return toBufferDealloc(buffer_pointer, 0, chunk.length, this.deallocator)
