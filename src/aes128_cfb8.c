@@ -15,7 +15,7 @@
   #include <wmmintrin.h>
   #include <smmintrin.h>
 #endif
-
+#define DEBUG 1
 // pre-computed t-table
 static const uint8_t rcon[11] = {
   0x00, 0x01, 0x02, 0x04, 0x08, 0x10,
@@ -308,7 +308,7 @@ static int cmp_double(const void *a, const void *b) {
   return (da > db) - (da < db);
 }
 
-struct ctx * get_ctx(uint8_t*iv, uint8_t*key) {
+struct ctx * get_ctx(uint8_t * key, uint8_t * iv) {
   struct ctx * ctx  = malloc(sizeof(struct ctx));
   if (!ctx) perror("malloc");
 
@@ -341,14 +341,28 @@ struct ctx * get_ctx(uint8_t*iv, uint8_t*key) {
 }
 
 void destroy_ctx(struct ctx * ctx) {
-  free(ctx);
+    #ifdef DEBUG
+        puts("context destroyed");
+    #endif
+    free(ctx);
 }
-void destroy_data(void * data) {
-  free(data);
+
+/* void (*JSTypedArrayBytesDeallocator)(void *bytes, void *deallocatorContext); */
+void destroy_data(void * data, void * ctx) {
+    #ifdef DEBUG
+        puts("data freed");
+    #endif
+    (void)ctx;
+    free(data);
+}
+JSTypedArrayBytesDeallocator get_deallocator () {
+    return destroy_data;
 }
 
 uint8_t * encrypt_ffi(uint8_t * data, uint32_t length, struct ctx * ctx) {
-
+    #ifdef DEBUG
+        printf("encrypting %u bytes\n", length);
+    #endif
   #ifdef AES_SOFT
     init_tables();
   #endif
@@ -361,7 +375,9 @@ uint8_t * encrypt_ffi(uint8_t * data, uint32_t length, struct ctx * ctx) {
   return scratch;
 }
 uint8_t * decrypt_ffi(uint8_t * data, uint32_t length, struct ctx * ctx) {
-
+    #ifdef DEBUG
+        printf("decrypting %u bytes\n", length);
+    #endif
   #ifdef AES_SOFT
     init_tables();
   #endif

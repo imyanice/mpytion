@@ -19,9 +19,9 @@ struct ctx {
   uint8_t iv[16];
   uint8_t key[16];
 };
-
+typedef void (*JSTypedArrayBytesDeallocator)(void *bytes, void *deallocatorContext);
 uint8_t * encrypt_ffi(uint8_t * data, uint32_t length, struct ctx * ctx);
 uint8_t * decrypt_ffi(uint8_t * data, uint32_t length, struct ctx * ctx);
-void destroy_data(void * data);
+void destroy_data(void * data, void * ctx);
 void destroy_ctx(struct ctx * ctx);
 struct ctx * get_ctx(uint8_t*iv, uint8_t*key);
