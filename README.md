@@ -1,4 +1,10 @@
 # aes 128 cfb8 mode decryption / encryption
+why? 
+> bun doesnt provide native aes 128 cfb8 decryption/encryption because it doesnt expose boringssl's methods.
+> see [oven-sh/bun/issues/28521](https://github.com/oven-sh/bun/issues/28521)
+
+why cfb8?
+> minecraft uses aes 128 cfb8 as the encryption method for its packets.
 
 ## benches
 > ~ 0.20ms faster on average
@@ -38,3 +44,6 @@ t: (µ ± σ) = 5.17ms ± 1.97ms
 p50 = 5.13ms | p99 = 9.24ms
       2.05ms...13.76ms
 ```
+
+## credits
+[@theMackabu](https://github.com/theMackabu) for writing the initial [implementation](bench/aes128_cfb8-bench.c).
