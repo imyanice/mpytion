@@ -18,15 +18,14 @@ const toBufferDealloc: (
 
 const cipher = get_ctx(key, iv)
 const decipher = get_ctx(key, iv)
-
 const deallocator = openssl.symbols.get_deallocator()
+
 if (!cipher || !deallocator || !decipher) {
 	console.log('could not get cipher/decipher/deallocator')
 	process.exit(1)
 }
 
-const data = Buffer.from(`
-Beans, beans, beans
+const lines = `Beans, beans, beans
 Jessie ate some beans
 He was happy, happy, happy
 That he ate some beans
@@ -43,27 +42,28 @@ Beans, beans, beans
 Jessie ate some beans
 And he drank some wine
 And he was happy, happy, happy
-That he drank some beans`)
-const res = encrypt(data, data.length, cipher)
-
-if (!res) {
-	console.log('could not cipher')
-	process.exit(1)
+That he drank some beans`
+	.split('\n')
+	.map((s) => Buffer.from(s))
+for (const line of lines) {
+	const res = encrypt(line, line.length, cipher)
+	if (!res) {
+		console.log('could not cipher')
+		process.exit(1)
+	}
+	const buffer_res = toBufferDealloc(res, 0, line.length, deallocator)
+	const orig = decrypt(buffer_res, line.length, decipher)
+	if (!orig) {
+		console.log('could not decipher')
+		process.exit(1)
+	}
+	const orig_res = toBufferDealloc(orig, 0, line.length, deallocator)
+	if (!orig_res.equals(line)) {
+		console.log('original and deciphered did NOT match!')
+		process.exit(1)
+	}
 }
-const buffer_res = toBufferDealloc(res, 0, data.length, deallocator)
-
-const orig = decrypt(buffer_res, data.length, decipher)
-if (!orig) {
-	console.log('could not decipher')
-	process.exit(1)
-}
-const orig_res = toBufferDealloc(orig, 0, data.length, deallocator)
-
-if (orig_res.equals(data)) {
-	console.log('original and deciphered matched!')
-} else {
-	console.log('original and deciphered did NOT match!')
-}
+console.log('original and deciphered matched!')
 
 destroy_ctx(cipher)
 destroy_ctx(decipher)

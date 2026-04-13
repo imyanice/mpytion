@@ -1,22 +1,23 @@
-import { dlopen, FFIType, Pointer, ptr as pointer } from 'bun:ffi'
+import { dlopen, FFIType, Pointer } from 'bun:ffi'
 
-export const openssl = dlopen(
-	'/Users/yanjobs/coding/lilith/openssl-bindings/dist/libaes128_cfb8.dylib',
-	{
-		get_ctx: { args: [FFIType.ptr, FFIType.ptr], returns: FFIType.ptr },
-		destroy_ctx: { args: [FFIType.ptr] },
-		destroy_data: { args: [FFIType.ptr, FFIType.ptr], returns: FFIType.void },
-		get_deallocator: { returns: FFIType.function },
-		encrypt_ffi: {
-			args: [FFIType.ptr, FFIType.uint32_t, FFIType.ptr],
-			returns: FFIType.ptr,
-		},
-		decrypt_ffi: {
-			args: [FFIType.ptr, FFIType.uint32_t, FFIType.ptr],
-			returns: FFIType.ptr,
-		},
+import libaes128_cfb8 from '../dist/libaes128_cfb8.dylib' with { type: 'file' }
+export const openssl = dlopen(libaes128_cfb8, {
+	get_ctx: { args: [FFIType.ptr, FFIType.ptr], returns: FFIType.ptr },
+	destroy_ctx: { args: [FFIType.ptr] },
+	destroy_data: { args: [FFIType.ptr, FFIType.ptr], returns: FFIType.void },
+	get_deallocator: { returns: FFIType.function },
+	init: {},
+	encrypt_ffi: {
+		args: [FFIType.ptr, FFIType.uint32_t, FFIType.ptr],
+		returns: FFIType.ptr,
 	},
-)
+	decrypt_ffi: {
+		args: [FFIType.ptr, FFIType.uint32_t, FFIType.ptr],
+		returns: FFIType.ptr,
+	},
+})
+openssl.symbols.init()
+
 type Context = Pointer
 type JSBuffer = NodeJS.TypedArray<ArrayBufferLike> /*| DataView<ArrayBufferLike>*/
 type uint32_t = number
