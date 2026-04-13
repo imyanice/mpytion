@@ -1,14 +1,17 @@
+#ifdef _WIN32
+#define EXPORT __declspec(dllexport)
+#include <windows.h>
+#include <winternl.h>
+#else
 #include <sys/utsname.h>
-
+#define EXPORT
+#endif
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
-#include <fcntl.h>
-#include <unistd.h>
-#include <sys/stat.h>
 #include "aes128_cfb8.h"
 #if defined(AES_ARM64)
   #include <arm_neon.h>
@@ -16,7 +19,8 @@
   #include <wmmintrin.h>
   #include <smmintrin.h>
 #endif
-// #define DEBUG 1
+// #define VERBOSE 0
+#define DEBUG 1
 // pre-computed t-table
 static const uint8_t rcon[11] = {
   0x00, 0x01, 0x02, 0x04, 0x08, 0x10,
@@ -84,7 +88,7 @@ static inline uint8_t xtime(uint8_t x) {
 }
 
 static void init_tables(void) {
-    #ifdef DEBUG
+    #ifdef VERBOSE
         printf("inititalizing lookup table\n");
     #endif
   for (int i = 0; i < 256; i++) {
@@ -107,7 +111,7 @@ static void init_tables(void) {
       ((uint32_t)s << 24) | ((uint32_t)s << 16) |
       ((uint32_t)s << 8)  |  (uint32_t)s;
   }
-  #ifdef DEBUG
+  #ifdef VERBOSE
       printf("initialized lookup table\n");
   #endif
 }
@@ -353,7 +357,7 @@ static void aes128_cfb8_decrypt(
 
 #endif
 
-struct ctx * get_ctx(uint8_t * key, uint8_t * iv) {
+EXPORT struct ctx * get_ctx(uint8_t * key, uint8_t * iv) {
     struct ctx * ctx  = malloc(sizeof(struct ctx));
     if (!ctx) perror("malloc");
 
@@ -387,27 +391,27 @@ struct ctx * get_ctx(uint8_t * key, uint8_t * iv) {
   return ctx;
 }
 
-void destroy_ctx(struct ctx * ctx) {
-    #ifdef DEBUG
+EXPORT void destroy_ctx(struct ctx * ctx) {
+    #ifdef VERBOSE
         puts("context destroyed");
     #endif
     free(ctx);
 }
 
 /* void (*JSTypedArrayBytesDeallocator)(void *bytes, void *deallocatorContext); */
-void destroy_data(void * data, void * ctx) {
-    #ifdef DEBUG
+EXPORT void destroy_data(void * data, void * ctx) {
+    #ifdef VERBOSE
         puts("data freed");
     #endif
     (void)ctx;
     free(data);
 }
-JSTypedArrayBytesDeallocator get_deallocator () {
+EXPORT JSTypedArrayBytesDeallocator get_deallocator () {
     return destroy_data;
 }
 
-uint8_t * encrypt_ffi(uint8_t * data, uint32_t length, struct ctx * ctx) {
-    #ifdef DEBUG
+EXPORT uint8_t * encrypt_ffi(uint8_t * data, uint32_t length, struct ctx * ctx) {
+    #ifdef VERBOSE
         printf("encrypting %u bytes\n", length);
     #endif
 
@@ -418,8 +422,8 @@ uint8_t * encrypt_ffi(uint8_t * data, uint32_t length, struct ctx * ctx) {
 
   return scratch;
 }
-uint8_t * decrypt_ffi(uint8_t * data, uint32_t length, struct ctx * ctx) {
-    #ifdef DEBUG
+EXPORT uint8_t * decrypt_ffi(uint8_t * data, uint32_t length, struct ctx * ctx) {
+    #ifdef VERBOSE
         printf("decrypting %u bytes\n", length);
     #endif
 
@@ -431,7 +435,8 @@ uint8_t * decrypt_ffi(uint8_t * data, uint32_t length, struct ctx * ctx) {
   return scratch;
 }
 
-void init() {
+
+EXPORT void init() {
     #ifdef DEBUG
         printf("system_info:\n");
         #ifdef AES_ARM64
@@ -442,11 +447,14 @@ void init() {
             printf("im soft~\n");
             printf("running without native functions, this is going to be slow!\n");
         #endif
-        struct utsname info = {0};
-        uname(&info);
+        #ifndef _WIN32 // microslop
+            struct utsname info = {0};
+            uname(&info);
 
-        printf("MACHINE: %s\n", info.machine);
-        printf("VERSION: %s\n", info.version);
+            printf("MACHINE: %s\n", info.machine);
+            printf("VERSION: %s\n", info.version);
+        #endif
+
     #endif
     #ifdef AES_SOFT
         init_tables();

@@ -26,22 +26,22 @@ jobs:
           - suffix: x86_64
             osname: linux
             lib: so
-            args: -shared -fPIC
+            args: -shared -fPIC -lm
             os: ubuntu-latest
           - suffix: aarch64
             osname: linux
             lib: so
-            args: -shared -fPIC
+            args: -shared -fPIC -lm
             os: ubuntu-24.04-arm
           - suffix: aarch64
             osname: macos
             lib: dylib
-            args: -dynamiclib
+            args: -dynamiclib -lm
             os: macos-latest
           - suffix: x86_64
             osname: macos
             lib: dylib
-            args: -dynamiclib
+            args: -dynamiclib -lm
             os: macos-latest-large
     runs-on: ${{ matrix.os }}
     steps:
@@ -62,7 +62,7 @@ jobs:
       - name: make dist/
         run: mkdir dist || true
       - name: build lib
-        run: clang -O3 -march=native ${{ matrix.args }} -o dist/libaes128_cfb8-${{ matrix.suffix }}.${{ matrix.lib }} src/aes128_cfb8.c -lm -fno-omit-frame-pointer
+        run: clang -O3 -march=native ${{ matrix.args }} -o dist/libaes128_cfb8-${{ matrix.suffix }}.${{ matrix.lib }} src/aes128_cfb8.c -fno-omit-frame-pointer
       - name: build bench
         run: bun build bench/bench.ts --define 'process.env.TARGET="${{ matrix.osname }}"' --define 'process.env.ARCH="${{ matrix.suffix }}"' --outfile=dist/aes128_cfb8-bench-${{ matrix.osname}}-${{ matrix.suffix }}${{ matrix.ext }} --compile
       - name: upload artifacts
