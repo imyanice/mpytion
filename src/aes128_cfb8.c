@@ -324,6 +324,32 @@ static void aes128_cfb8_encrypt(
     iv[15] = cb;
   }
 }
+static void aes128_cfb8_decrypt(
+  const uint8_t *in, uint8_t *out,
+  size_t len, const __m128i rk[11], uint8_t iv[16]
+) {
+  for (size_t i = 0; i < len; i++) {
+    __m128i state = _mm_loadu_si128((const __m128i *)iv);
+
+    state = _mm_aesenc_si128(_mm_xor_si128(state, rk[0]), rk[1]);
+    state = _mm_aesenc_si128(state, rk[2]);
+    state = _mm_aesenc_si128(state, rk[3]);
+    state = _mm_aesenc_si128(state, rk[4]);
+    state = _mm_aesenc_si128(state, rk[5]);
+    state = _mm_aesenc_si128(state, rk[6]);
+    state = _mm_aesenc_si128(state, rk[7]);
+    state = _mm_aesenc_si128(state, rk[8]);
+    state = _mm_aesenc_si128(state, rk[9]);
+    state = _mm_aesenclast_si128(state, rk[10]);
+
+    uint8_t enc_byte = (uint8_t)_mm_extract_epi8(state, 0);
+    uint8_t cb = in[i] ^ enc_byte;
+
+    out[i] = cb;
+    memmove(iv, iv + 1, 15);
+    iv[15] = in[i];
+  }
+}
 
 #endif
 
@@ -336,7 +362,7 @@ struct ctx * get_ctx(uint8_t * key, uint8_t * iv) {
 
     uint32_t rk32[44] = {0};
     aes128_key_expand(ctx->key, rk32);
-    #ifdef AES_ARM64
+    #if defined(AES_ARM64)
         // 8 * 176 b
         for (int i = 0; i < 44; i+=4) {
             uint32x4_t vec32 = vld1q_u32(rk32 + i);
@@ -355,7 +381,7 @@ struct ctx * get_ctx(uint8_t * key, uint8_t * iv) {
         key_bytes[i*4+3] = (uint8_t)(rk32[i]);
         }
         aes128_key_expand_ni(key_bytes, ctx->rk);
-    #elif defined (AES_SOFT)
+    #else
         memcpy(ctx->rk, rk32, 44 * 4);
     #endif
   return ctx;
