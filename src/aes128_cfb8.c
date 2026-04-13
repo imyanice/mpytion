@@ -16,7 +16,7 @@
   #include <wmmintrin.h>
   #include <smmintrin.h>
 #endif
-#define DEBUG 1
+// #define DEBUG 1
 // pre-computed t-table
 static const uint8_t rcon[11] = {
   0x00, 0x01, 0x02, 0x04, 0x08, 0x10,

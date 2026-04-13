@@ -1,7 +1,25 @@
 import { dlopen, FFIType, Pointer } from 'bun:ffi'
 
-import libaes128_cfb8 from '../dist/libaes128_cfb8.dylib' with { type: 'file' }
-export const openssl = dlopen(libaes128_cfb8, {
+
+/* this is ugly */
+let lib: { default: string } = { default: "" };
+if (process.arch !== "arm64" && process.arch !== "x64") console.log("weird architecture, hmm..", process.arch)
+if (process.platform !== "darwin" && process.platform !== "win32" && process.platform !== "linux") console.log("weird os, hmm..", process.platform)
+
+if (process.env.TARGET == "macos") {
+  if (process.env.ARCH == "aarch64") lib = await import('../dist/libaes128_cfb8-aarch64.dylib', { with: { type: 'file' } })
+  else if (process.env.ARCH == "x86_64") lib = await import('../dist/libaes128_cfb8-x86_64.dylib', { with: { type: 'file' } })
+} else if (process.env.TARGET == "win") {
+  if (process.env.ARCH == "aarch64") lib = await import('../dist/libaes128_cfb8-aarch64.dll', { with: { type: 'file' } })
+  else if (process.env.ARCH == "x86_64") lib = await import('../dist/libaes128_cfb8-x86_64.dll', { with: { type: 'file' } })
+} else if (process.env.TARGET == "linux") {
+  if (process.env.ARCH == "aarch64") lib = await import('../dist/libaes128_cfb8-aarch64.so', { with: { type: 'file' } })
+  else if (process.env.ARCH == "x86_64") lib = await import('../dist/libaes128_cfb8-x86_64.so', { with: { type: 'file' } })
+}
+
+/* end of uglyness */
+
+export const openssl = dlopen(lib.default, {
 	get_ctx: { args: [FFIType.ptr, FFIType.ptr], returns: FFIType.ptr },
 	destroy_ctx: { args: [FFIType.ptr] },
 	destroy_data: { args: [FFIType.ptr, FFIType.ptr], returns: FFIType.void },
