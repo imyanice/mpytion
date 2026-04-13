@@ -1,3 +1,5 @@
+#include <sys/utsname.h>
+
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
@@ -8,7 +10,6 @@
 #include <unistd.h>
 #include <sys/stat.h>
 #include "aes128_cfb8.h"
-
 #if defined(AES_ARM64)
   #include <arm_neon.h>
 #elif defined(AES_X86)
@@ -83,6 +84,9 @@ static inline uint8_t xtime(uint8_t x) {
 }
 
 static void init_tables(void) {
+    #ifdef DEBUG
+        printf("inititalizing lookup table\n");
+    #endif
   for (int i = 0; i < 256; i++) {
     uint8_t s = sbox[i];
     uint8_t s2 = xtime(s);
@@ -103,6 +107,9 @@ static void init_tables(void) {
       ((uint32_t)s << 24) | ((uint32_t)s << 16) |
       ((uint32_t)s << 8)  |  (uint32_t)s;
   }
+  #ifdef DEBUG
+      printf("initialized lookup table\n");
+  #endif
 }
 
 static inline uint8_t aes128_encrypt_first_byte(uint64_t hi, uint64_t lo, const uint32_t rk[44]) {
@@ -152,6 +159,30 @@ static void aes128_cfb8_encrypt(
     hi = (hi << 8) | (lo >> 56);
     lo = (lo << 8) | cb;
   }
+  memcpy(iv, &hi, 8);
+  memcpy(iv + 8, &lo, 8);
+}
+static void aes128_cfb8_decrypt(
+  const uint8_t *in, uint8_t *out,
+  size_t len, const uint32_t rk[44], uint8_t iv[16]
+) {
+  uint64_t hi, lo;
+  memcpy(&hi, iv, 8);
+  memcpy(&lo, iv + 8, 8);
+  #if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+    hi = __builtin_bswap64(hi);
+    lo = __builtin_bswap64(lo);
+  #endif
+
+  for (size_t i = 0; i < len; i++) {
+    uint8_t eb = aes128_encrypt_first_byte(hi, lo, rk);
+    uint8_t cb = in[i] ^ eb;
+    out[i] = cb;
+    hi = (hi << 8) | (lo >> 56);
+    lo = (lo << 8) | in[i];
+  }
+  memcpy(iv, &hi, 8);
+  memcpy(iv + 8, &lo, 8);
 }
 
 #endif
@@ -296,47 +327,37 @@ static void aes128_cfb8_encrypt(
 
 #endif
 
-// bench code
-static double now_ms(void) {
-  struct timespec ts;
-  clock_gettime(CLOCK_MONOTONIC, &ts);
-  return ts.tv_sec * 1000.0 + ts.tv_nsec / 1e6;
-}
-
-static int cmp_double(const void *a, const void *b) {
-  double da = *(const double *)a, db = *(const double *)b;
-  return (da > db) - (da < db);
-}
-
 struct ctx * get_ctx(uint8_t * key, uint8_t * iv) {
-  struct ctx * ctx  = malloc(sizeof(struct ctx));
-  if (!ctx) perror("malloc");
+    struct ctx * ctx  = malloc(sizeof(struct ctx));
+    if (!ctx) perror("malloc");
 
-  memcpy(ctx->iv, iv, 16);
-  memcpy(ctx->key, key, 16);
+    memcpy(ctx->iv, iv, 16);
+    memcpy(ctx->key, key, 16);
 
-  uint32_t rk32[44] = {0};
-  aes128_key_expand(ctx->key, rk32);
-  #ifdef AES_ARM64
-    // 8 * 176 b
-    for (int i = 0; i < 44; i+=4) {
-        uint32x4_t vec32 = vld1q_u32(rk32 + i);
-        uint8x16_t vec8 = vreinterpretq_u8_u32(vec32);
-        vec8 = vrev32q_u8(vec8);
-        vst1q_u8((*ctx).rk + i*4, vec8);
-    }
+    uint32_t rk32[44] = {0};
+    aes128_key_expand(ctx->key, rk32);
+    #ifdef AES_ARM64
+        // 8 * 176 b
+        for (int i = 0; i < 44; i+=4) {
+            uint32x4_t vec32 = vld1q_u32(rk32 + i);
+            uint8x16_t vec8 = vreinterpretq_u8_u32(vec32);
+            vec8 = vrev32q_u8(vec8);
+            vst1q_u8((*ctx).rk + i*4, vec8);
+        }
 
-  #elif defined(AES_X86)
-    // 11 * 128
-    uint8_t key_bytes[16];
-    for (int i = 0; i < 4; i++) {
-      key_bytes[i*4+0] = (uint8_t)(rk32[i] >> 24);
-      key_bytes[i*4+1] = (uint8_t)(rk32[i] >> 16);
-      key_bytes[i*4+2] = (uint8_t)(rk32[i] >> 8);
-      key_bytes[i*4+3] = (uint8_t)(rk32[i]);
-    }
-    aes128_key_expand_ni(key_bytes, ctx->rk);
-  #endif
+    #elif defined(AES_X86)
+        // 11 * 128
+        uint8_t key_bytes[16];
+        for (int i = 0; i < 4; i++) {
+        key_bytes[i*4+0] = (uint8_t)(rk32[i] >> 24);
+        key_bytes[i*4+1] = (uint8_t)(rk32[i] >> 16);
+        key_bytes[i*4+2] = (uint8_t)(rk32[i] >> 8);
+        key_bytes[i*4+3] = (uint8_t)(rk32[i]);
+        }
+        aes128_key_expand_ni(key_bytes, ctx->rk);
+    #elif defined (AES_SOFT)
+        memcpy(ctx->rk, rk32, 44 * 4);
+    #endif
   return ctx;
 }
 
@@ -363,9 +384,6 @@ uint8_t * encrypt_ffi(uint8_t * data, uint32_t length, struct ctx * ctx) {
     #ifdef DEBUG
         printf("encrypting %u bytes\n", length);
     #endif
-  #ifdef AES_SOFT
-    init_tables();
-  #endif
 
   uint8_t *scratch = malloc(length);
   if (!scratch) { perror("malloc"); return NULL; }
@@ -378,9 +396,6 @@ uint8_t * decrypt_ffi(uint8_t * data, uint32_t length, struct ctx * ctx) {
     #ifdef DEBUG
         printf("decrypting %u bytes\n", length);
     #endif
-  #ifdef AES_SOFT
-    init_tables();
-  #endif
 
   uint8_t *scratch = malloc(length);
   if (!scratch) { perror("malloc"); return NULL; }
@@ -388,4 +403,26 @@ uint8_t * decrypt_ffi(uint8_t * data, uint32_t length, struct ctx * ctx) {
   aes128_cfb8_decrypt(data, scratch, length, ctx->rk, ctx->iv);
 
   return scratch;
+}
+
+void init() {
+    #ifdef DEBUG
+        printf("system_info:\n");
+        #ifdef AES_ARM64
+            printf("running with arm64 intrinsics\n");
+        #elif defined (AES_X86)
+            printf("running with X86 intrinsics\n");
+        #elif defined(AES_SOFT)
+            printf("im soft~\n");
+            printf("running without native functions, this is going to be slow!\n");
+        #endif
+        struct utsname info = {0};
+        uname(&info);
+
+        printf("MACHINE: %s\n", info.machine);
+        printf("VERSION: %s\n", info.version);
+    #endif
+    #ifdef AES_SOFT
+        init_tables();
+    #endif
 }

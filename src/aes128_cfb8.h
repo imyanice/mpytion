@@ -1,4 +1,5 @@
 #if defined(__aarch64__) && (defined(__ARM_FEATURE_CRYPTO) || defined(__ARM_FEATURE_AES) || defined(__APPLE__))
+#include <stdint.h>
   #define AES_ARM64 1
   #include <arm_neon.h>
 #elif defined(__x86_64__) && defined(__AES__)
@@ -14,6 +15,8 @@ struct ctx {
   uint8_t rk[176];
   #elif defined(AES_x86)
   __m128i rk[11];
+  #elif defined (AES_SOFT)
+  uint32_t rk[44];
   #endif
 
   uint8_t iv[16];
