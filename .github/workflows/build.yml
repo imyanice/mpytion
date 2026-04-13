@@ -1,0 +1,74 @@
+#ubuntu-latest, windows-latest, macos-latest, macos-latest-large, ubuntu-24.04-arm, windows-11-arm
+#clang -O3 -march=native -shared -fPIC -o dist/out.so src/in.c -lm -fno-omit-frame-pointer
+#clang -O3 -march=native -shared -o dist/out.dll src/in.c -lm -fno-omit-frame-pointer
+#clang -O3 -march=native -dynamiclib -o dist/out.dylib src/in.c -lm -fno-omit-frame-pointer
+name: build EVERYTHING!
+on: workflow_dispatch
+jobs:
+  build:
+    strategy:
+      matrix:
+        os: [windows-latest, windows-11-arm, ubuntu-latest, ubuntu-24.04-arm, macos-latest, macos-latest-large]
+        include:
+          - ext: ""
+          - suffix: x86_64
+            osname: win
+            lib: dll
+            args: -shared
+            ext: ".exe"
+            os: windows-latest
+          - suffix: aarch64
+            osname: win
+            lib: dll
+            args: -shared
+            ext: ".exe"
+            os: windows-11-arm
+          - suffix: x86_64
+            osname: linux
+            lib: so
+            args: -shared -fPIC
+            os: ubuntu-latest
+          - suffix: aarch64
+            osname: linux
+            lib: so
+            args: -shared -fPIC
+            os: ubuntu-24.04-arm
+          - suffix: aarch64
+            osname: macos
+            lib: dylib
+            args: -dynamiclib
+            os: macos-latest
+          - suffix: x86_64
+            osname: macos
+            lib: dylib
+            args: -dynamiclib
+            os: macos-latest-large
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: checkout
+        uses: actions/checkout@v6.0.2
+      - name: install bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - name: restore deps cache
+        uses: actions/cache@v5.0.5
+        with:
+          path: |
+            node_modules/
+          key: deps-${{ matrix.os }}
+      - name: install deps
+        run: bun install
+      - name: make dist/
+        run: mkdir dist || true
+      - name: build lib
+        run: clang -O3 -march=native ${{ matrix.args }} -o dist/libaes128_cfb8-${{ matrix.suffix }}.${{ matrix.lib }} src/aes128_cfb8.c -lm -fno-omit-frame-pointer
+      - name: build bench
+        run: bun build bench/bench.ts --define 'process.env.TARGET="${{ matrix.osname }}"' --define 'process.env.ARCH="${{ matrix.suffix }}"' --outfile=dist/aes128_cfb8-bench-${{ matrix.osname}}-${{ matrix.suffix }}${{ matrix.ext }} --compile
+      - name: upload artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ matrix.osname }}-${{ matrix.suffix }}
+          path: |
+            dist/aes128_cfb8-bench-${{ matrix.osname }}-${{ matrix.suffix }}${{ matrix.ext }}
+            dist/libaes128_cfb8-${{ matrix.suffix }}.${{ matrix.lib }}
